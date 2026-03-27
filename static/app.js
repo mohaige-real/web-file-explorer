@@ -139,15 +139,15 @@ function renderGrid(tab) {
   fileGridEl.innerHTML = sorted
     .map((entry) => {
       const icon = entry.type === "dir" ? "📁" : "📄";
-      const openAction =
+      const openActionOnCard =
         entry.type === "dir"
           ? `ondblclick="openDir('${encodeURIComponent(entry.path)}')" title="双击打开文件夹"`
-          : `ondblclick="previewFile('${encodeURIComponent(entry.path)}')" title="双击预览文件"`;
+          : `onclick="previewFile('${encodeURIComponent(entry.path)}')" title="单击预览文件"`;
 
       return `
-        <div class="entry-card" oncontextmenu="showContextMenu(event, '${encodeURIComponent(entry.path)}')">
+        <div class="entry-card" ${openActionOnCard} oncontextmenu="showContextMenu(event, '${encodeURIComponent(entry.path)}')">
           <div class="entry-main">
-            <div class="entry-icon" ${openAction}>${icon}</div>
+            <div class="entry-icon">${icon}</div>
             <div class="entry-text" style="min-width:0;flex:1;">
               <div class="entry-title">${escapeHtml(entry.name)}</div>
               ${buildMetaByDensity(entry)}

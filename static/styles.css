@@ -47,7 +47,7 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 .file-grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: 10px; }
 .entry-card { border: 1px solid #e1e9fa; border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, 0.92); transition: transform .15s ease, box-shadow .15s ease; }
 .entry-card:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(35, 78, 194, 0.1); }
-.entry-main { display: flex; gap: 10px; align-items: center; }
+.entry-main { display: flex; gap: 10px; align-items: center; user-select: none; }
 .entry-icon { font-size: var(--icon-size); line-height: 1; width: calc(var(--icon-size) + 8px); text-align: center; cursor: pointer; user-select: none; }
 .entry-title { color: #1b4fcb; text-decoration: none; font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-meta { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.5; }
