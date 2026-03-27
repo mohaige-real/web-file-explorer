@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>网页文件浏览器</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>网页文件浏览器</h1>
+
+      <section class="tabbar-wrap">
+        <div id="tabbar" class="tabbar"></div>
+        <button id="new-tab-btn" type="button">+ 新建标签页</button>
+      </section>
+
+      <section class="toolbar">
+        <button id="up-btn" type="button">⬆ 返回上级</button>
+        <input id="path-input" type="text" autocomplete="off" />
+        <button id="go-btn" type="button">打开路径</button>
+      </section>
+
+      <p class="hint">浏览范围根目录：<code id="root-path">{{ browse_root }}</code></p>
+
+      <section class="layout">
+        <article class="panel left-panel">
+          <h2>文件夹浏览</h2>
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="type">类型</th>
+                <th data-sort="name">文件名</th>
+                <th data-sort="size">大小</th>
+                <th data-sort="modified">修改日期</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="file-table-body"></tbody>
+          </table>
+          <p id="status"></p>
+        </article>
+
+        <article class="panel right-panel">
+          <h2>文件预览</h2>
+          <div id="preview-meta" class="preview-meta">请从左侧选择一个文件进行预览。</div>
+          <div id="preview-content" class="preview-content"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
