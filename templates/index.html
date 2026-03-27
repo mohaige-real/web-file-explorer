@@ -14,9 +14,12 @@
       </section>
 
       <section class="toolbar glass">
+        <button id="back-btn" type="button" class="btn">↩ 后退</button>
         <button id="up-btn" type="button" class="btn">⬆ 返回上级</button>
-        <input id="path-input" type="text" autocomplete="off" />
-        <button id="go-btn" type="button" class="btn primary">打开路径</button>
+        <div class="path-box">
+          <input id="path-input" type="text" autocomplete="off" />
+          <div id="path-suggestions" class="path-suggestions"></div>
+        </div>
       </section>
 
       <p class="hint">浏览范围根目录：<code id="root-path">{{ browse_root }}</code></p>
