@@ -3,6 +3,8 @@ const statusEl = document.getElementById("status");
 const pathInput = document.getElementById("path-input");
 const upBtn = document.getElementById("up-btn");
 const goBtn = document.getElementById("go-btn");
+const previewMetaEl = document.getElementById("preview-meta");
+const previewContentEl = document.getElementById("preview-content");
 
 let currentPath = document.getElementById("root-path").textContent;
 let currentParent = null;
@@ -23,6 +25,11 @@ function escapeHtml(raw) {
   const div = document.createElement("div");
   div.textContent = raw;
   return div.innerHTML;
+}
+
+function clearPreview(message = "请从左侧选择一个文件进行预览。") {
+  previewMetaEl.textContent = message;
+  previewContentEl.innerHTML = "";
 }
 
 function sortEntries(entries) {
@@ -57,10 +64,11 @@ function renderTable(entries) {
   const sorted = sortEntries(entries);
   tbody.innerHTML = sorted
     .map((entry) => {
-      const openAction =
+      const openDirAction =
         entry.type === "dir"
-          ? `onclick="openDir('${encodeURIComponent(entry.path)}')"`
-          : "";
+          ? `<span class="dir-link" onclick="openDir('${encodeURIComponent(entry.path)}')">${escapeHtml(entry.name)}</span>`
+          : `<span class="file-link" onclick="previewFile('${encodeURIComponent(entry.path)}')">${escapeHtml(entry.name)}</span>`;
+
       const fileAction =
         entry.type === "file"
           ? `<a href="/api/download?path=${encodeURIComponent(entry.path)}">下载</a>`
@@ -69,7 +77,7 @@ function renderTable(entries) {
       return `
       <tr>
         <td>${entry.type === "dir" ? "📁 文件夹" : "📄 文件"}</td>
-        <td class="name-cell" ${openAction}>${escapeHtml(entry.name)}</td>
+        <td class="name-cell">${openDirAction}</td>
         <td>${entry.size_human}</td>
         <td>${formatDate(entry.modified)}</td>
         <td>${fileAction}</td>
@@ -93,10 +101,88 @@ async function fetchDir(path) {
     pathInput.value = currentPath;
     renderTable(currentEntries);
     showStatus(`共 ${currentEntries.length} 项`);
+    clearPreview();
   } catch (err) {
     showStatus(err.message, true);
   }
 }
+
+async function previewText(path) {
+  const resp = await fetch(`/api/text?path=${encodeURIComponent(path)}`);
+  if (!resp.ok) {
+    throw new Error(`文本预览失败：${resp.status}`);
+  }
+  const data = await resp.json();
+  previewContentEl.innerHTML = `<pre>${escapeHtml(data.content)}</pre>`;
+}
+
+function previewImage(path) {
+  previewContentEl.innerHTML = `<img src="/api/raw?path=${encodeURIComponent(path)}" alt="image preview" />`;
+}
+
+function previewVideo(path) {
+  previewContentEl.innerHTML = `<video controls src="/api/raw?path=${encodeURIComponent(path)}"></video>`;
+}
+
+function previewAudio(path) {
+  previewContentEl.innerHTML = `<audio controls src="/api/raw?path=${encodeURIComponent(path)}"></audio>`;
+}
+
+function previewFallback(path, mimeType) {
+  previewContentEl.innerHTML = `
+    <p>当前文件类型暂不支持内嵌预览。</p>
+    <p>MIME: <code>${escapeHtml(mimeType || "unknown")}</code></p>
+    <p><a href="/api/raw?path=${encodeURIComponent(path)}" target="_blank" rel="noreferrer">新窗口打开</a></p>
+  `;
+}
+
+window.previewFile = async function previewFile(encodedPath) {
+  const path = decodeURIComponent(encodedPath);
+  try {
+    previewMetaEl.textContent = "正在加载预览...";
+    previewContentEl.innerHTML = "";
+
+    const metaResp = await fetch(`/api/preview-meta?path=${encodeURIComponent(path)}`);
+    if (!metaResp.ok) {
+      throw new Error(`获取预览信息失败：${metaResp.status}`);
+    }
+
+    const meta = await metaResp.json();
+    previewMetaEl.innerHTML = `
+      <strong>${escapeHtml(meta.name)}</strong><br />
+      大小：${escapeHtml(meta.size_human)} ｜ 修改：${escapeHtml(formatDate(meta.modified))} ｜ 类型：${escapeHtml(meta.mime_type)}
+    `;
+
+    if (meta.kind === "text") {
+      if (meta.text_too_large) {
+        previewContentEl.innerHTML = `<p>文本文件过大（>${escapeHtml(String(512))}KB），请下载后查看。</p>`;
+      } else {
+        await previewText(path);
+      }
+      return;
+    }
+
+    if (meta.kind === "image") {
+      previewImage(path);
+      return;
+    }
+
+    if (meta.kind === "video") {
+      previewVideo(path);
+      return;
+    }
+
+    if (meta.kind === "audio") {
+      previewAudio(path);
+      return;
+    }
+
+    previewFallback(path, meta.mime_type);
+  } catch (err) {
+    previewMetaEl.textContent = "预览失败";
+    previewContentEl.innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+  }
+};
 
 window.openDir = function openDir(encodedPath) {
   const path = decodeURIComponent(encodedPath);

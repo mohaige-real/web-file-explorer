@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 import os
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ app = Flask(__name__)
 
 # Restrict browsing to this root directory. You can change it with FILE_BROWSER_ROOT.
 BROWSE_ROOT = Path(os.environ.get("FILE_BROWSER_ROOT", "/")).resolve()
+MAX_TEXT_PREVIEW_SIZE = 512 * 1024  # 512 KB
 
 
 def _safe_path(raw_path: str) -> Path:
@@ -36,6 +38,7 @@ def _human_size(num: int) -> str:
 def _entry_to_dict(path: Path) -> dict[str, Any]:
     stat = path.stat()
     is_dir = path.is_dir()
+    mime_type, _ = mimetypes.guess_type(path.name)
     return {
         "name": path.name,
         "path": str(path),
@@ -43,7 +46,26 @@ def _entry_to_dict(path: Path) -> dict[str, Any]:
         "size": 0 if is_dir else stat.st_size,
         "size_human": "-" if is_dir else _human_size(stat.st_size),
         "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+        "mime_type": mime_type or "",
     }
+
+
+def _get_file_kind(path: Path) -> str:
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if not mime_type:
+        return "binary"
+
+    if mime_type.startswith("text/"):
+        return "text"
+    if mime_type.startswith("image/"):
+        return "image"
+    if mime_type.startswith("video/"):
+        return "video"
+    if mime_type.startswith("audio/"):
+        return "audio"
+    if mime_type in {"application/pdf", "application/json", "application/xml"}:
+        return "text"
+    return "binary"
 
 
 @app.route("/")
@@ -79,6 +101,88 @@ def list_directory():
             "current": str(target),
             "parent": parent,
             "entries": entries,
+        }
+    )
+
+
+@app.route("/api/preview-meta")
+def preview_meta():
+    raw_path = request.args.get("path", "")
+    if not raw_path:
+        abort(400, description="Missing path")
+
+    try:
+        target = _safe_path(raw_path)
+    except PermissionError:
+        abort(403, description="Access denied")
+
+    if not target.exists() or not target.is_file():
+        abort(404, description="File not found")
+
+    kind = _get_file_kind(target)
+    mime_type, _ = mimetypes.guess_type(target.name)
+    stat = target.stat()
+    return jsonify(
+        {
+            "path": str(target),
+            "name": target.name,
+            "kind": kind,
+            "mime_type": mime_type or "application/octet-stream",
+            "size": stat.st_size,
+            "size_human": _human_size(stat.st_size),
+            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            "text_too_large": kind == "text" and stat.st_size > MAX_TEXT_PREVIEW_SIZE,
+        }
+    )
+
+
+@app.route("/api/raw")
+def raw_file():
+    raw_path = request.args.get("path", "")
+    if not raw_path:
+        abort(400, description="Missing path")
+
+    try:
+        target = _safe_path(raw_path)
+    except PermissionError:
+        abort(403, description="Access denied")
+
+    if not target.exists() or not target.is_file():
+        abort(404, description="File not found")
+
+    mime_type, _ = mimetypes.guess_type(target.name)
+    return send_file(target, as_attachment=False, mimetype=mime_type)
+
+
+@app.route("/api/text")
+def text_preview():
+    raw_path = request.args.get("path", "")
+    if not raw_path:
+        abort(400, description="Missing path")
+
+    try:
+        target = _safe_path(raw_path)
+    except PermissionError:
+        abort(403, description="Access denied")
+
+    if not target.exists() or not target.is_file():
+        abort(404, description="File not found")
+
+    if target.stat().st_size > MAX_TEXT_PREVIEW_SIZE:
+        abort(413, description="File is too large for text preview")
+
+    try:
+        content = target.read_text(encoding="utf-8")
+        encoding = "utf-8"
+    except UnicodeDecodeError:
+        content = target.read_text(encoding="gb18030", errors="replace")
+        encoding = "gb18030"
+
+    return jsonify(
+        {
+            "path": str(target),
+            "encoding": encoding,
+            "content": content,
         }
     )
 
