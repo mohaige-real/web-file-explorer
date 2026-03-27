@@ -11,6 +11,8 @@ const newTabBtn = document.getElementById("new-tab-btn");
 const sortSelect = document.getElementById("sort-select");
 const sortOrderBtn = document.getElementById("sort-order-btn");
 const searchInput = document.getElementById("search-input");
+const toggleDisplaySettingsBtn = document.getElementById("toggle-display-settings");
+const displaySettingsEl = document.getElementById("display-settings");
 const iconSizeInput = document.getElementById("icon-size");
 const iconSizeLabel = document.getElementById("icon-size-label");
 const columnCountInput = document.getElementById("column-count");
@@ -327,6 +329,10 @@ searchInput.addEventListener("input", () => { const tab = getActiveTab(); if (ta
 iconSizeInput.addEventListener("input", () => { uiPrefs.iconSize = Number(iconSizeInput.value); applyUiPrefs(); savePrefs(); });
 columnCountInput.addEventListener("input", () => { uiPrefs.columns = Number(columnCountInput.value); applyUiPrefs(); savePrefs(); });
 densitySlider.addEventListener("input", () => { uiPrefs.densityLevel = Number(densitySlider.value); applyUiPrefs(); savePrefs(); const tab = getActiveTab(); if (tab) renderGrid(tab); });
+toggleDisplaySettingsBtn.addEventListener("click", () => {
+  const isOpen = displaySettingsEl.classList.toggle("open");
+  toggleDisplaySettingsBtn.textContent = isOpen ? "收起显示设置 ▴" : "展开显示设置 ▾";
+});
 
 let resizing = false;
 resizerEl.addEventListener("mousedown", () => { resizing = true; document.body.style.userSelect = "none"; });
