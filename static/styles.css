@@ -113,6 +113,8 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 .compact-controls { width: 100%; }
 .compact-item { min-width: 160px; }
 .search-item { flex: 1; min-width: 260px; }
+.search-item { border: none !important; background: transparent !important; padding: 0 !important; }
+.search-item input { width: 100%; min-height: 36px !important; height: 36px; margin: 0; }
 
 .display-settings {
   display: none;
