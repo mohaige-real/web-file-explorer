@@ -8,6 +8,8 @@ const previewContentEl = document.getElementById("preview-content");
 const tabbarEl = document.getElementById("tabbar");
 const newTabBtn = document.getElementById("new-tab-btn");
 const sortSelect = document.getElementById("sort-select");
+const sortOrderBtn = document.getElementById("sort-order-btn");
+const searchInput = document.getElementById("search-input");
 const iconSizeInput = document.getElementById("icon-size");
 const iconSizeLabel = document.getElementById("icon-size-label");
 const columnCountInput = document.getElementById("column-count");
@@ -113,6 +115,16 @@ function sortEntries(entries, tab) {
   return sorted;
 }
 
+function filterEntries(entries) {
+  const raw = searchInput.value.trim().toLowerCase();
+  if (!raw) return entries;
+  const terms = raw.split(/\s+/).filter(Boolean);
+  return entries.filter((entry) => {
+    const name = entry.name.toLowerCase();
+    return terms.every((term) => name.includes(term));
+  });
+}
+
 function buildMetaByDensity(entry) {
   if (uiPrefs.densityLevel === 1) return "";
   if (uiPrefs.densityLevel === 2) {
@@ -122,7 +134,8 @@ function buildMetaByDensity(entry) {
 }
 
 function renderGrid(tab) {
-  const sorted = sortEntries(tab.entries, tab);
+  const filtered = filterEntries(tab.entries);
+  const sorted = sortEntries(filtered, tab);
   fileGridEl.innerHTML = sorted
     .map((entry) => {
       const icon = entry.type === "dir" ? "📁" : "📄";
@@ -144,6 +157,7 @@ function renderGrid(tab) {
       `;
     })
     .join("");
+  showStatus(`显示 ${sorted.length} / 共 ${tab.entries.length} 项`);
 }
 
 function renderActiveTab() {
@@ -158,8 +172,8 @@ function renderActiveTab() {
   }
   pathInput.value = tab.currentPath;
   sortSelect.value = tab.sortKey;
+  sortOrderBtn.textContent = tab.sortDir === 1 ? "升序 ↑" : "降序 ↓";
   renderGrid(tab);
-  showStatus(`共 ${tab.entries.length} 项`);
   previewMetaEl.innerHTML = tab.previewMeta;
   previewContentEl.innerHTML = tab.previewHTML;
   renderTabs();
@@ -334,7 +348,14 @@ newTabBtn.addEventListener("click", () => createTab(getActiveTab()?.currentPath 
 upBtn.addEventListener("click", () => { const tab = getActiveTab(); if (tab?.currentParent) fetchDir(tab.id, tab.currentParent); });
 goBtn.addEventListener("click", () => { const tab = getActiveTab(); if (tab) fetchDir(tab.id, pathInput.value.trim()); });
 pathInput.addEventListener("keydown", (event) => { if (event.key === "Enter") { const tab = getActiveTab(); if (tab) fetchDir(tab.id, pathInput.value.trim()); }});
-sortSelect.addEventListener("change", () => { const tab = getActiveTab(); if (!tab) return; if (tab.sortKey === sortSelect.value) tab.sortDir *= -1; else { tab.sortKey = sortSelect.value; tab.sortDir = 1; } renderGrid(tab); });
+sortSelect.addEventListener("change", () => {
+  const tab = getActiveTab();
+  if (!tab) return;
+  tab.sortKey = sortSelect.value;
+  renderGrid(tab);
+});
+sortOrderBtn.addEventListener("click", () => { const tab = getActiveTab(); if (!tab) return; tab.sortDir *= -1; sortOrderBtn.textContent = tab.sortDir === 1 ? "升序 ↑" : "降序 ↓"; renderGrid(tab); });
+searchInput.addEventListener("input", () => { const tab = getActiveTab(); if (tab) renderGrid(tab); });
 
 iconSizeInput.addEventListener("input", () => { uiPrefs.iconSize = Number(iconSizeInput.value); applyUiPrefs(); });
 columnCountInput.addEventListener("input", () => { uiPrefs.columns = Number(columnCountInput.value); applyUiPrefs(); });
