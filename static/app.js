@@ -107,7 +107,7 @@ function renderPathSuggestions() {
       if (item.type === "open") {
         return `<div class="suggest-item" onclick="openFromSuggestion('${encodeURIComponent(item.path)}')"><span>打开路径：${escapeHtml(item.path)}</span></div>`;
       }
-      return `<div class="suggest-item"><span onclick="openFromSuggestion('${encodeURIComponent(item.path)}')">${escapeHtml(item.path)}</span><button onclick="deleteSuggestionPath(event, '${encodeURIComponent(item.path)}')">删除</button></div>`;
+      return `<div class="suggest-item" onclick="openFromSuggestion('${encodeURIComponent(item.path)}')"><span>${escapeHtml(item.path)}</span><button onclick="deleteSuggestionPath(event, '${encodeURIComponent(item.path)}')">删除</button></div>`;
     })
     .join("");
   pathSuggestionsEl.style.display = "block";
@@ -306,6 +306,10 @@ upBtn.addEventListener("click", () => { const tab = getActiveTab(); if (tab?.cur
 
 pathInput.addEventListener("focus", renderPathSuggestions);
 pathInput.addEventListener("input", renderPathSuggestions);
+pathSuggestionsEl.addEventListener("mousedown", (event) => {
+  // Prevent input blur before suggestion click is handled.
+  event.preventDefault();
+});
 pathInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
