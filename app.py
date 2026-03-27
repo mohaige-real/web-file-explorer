@@ -103,12 +103,20 @@ def list_directory():
         abort(404, description="Directory not found")
 
     entries = []
-    for child in sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+    try:
+        children = list(target.iterdir())
+    except OSError:
+        abort(403, description="Directory is not readable")
+
+    for child in children:
         try:
             entries.append(_entry_to_dict(child))
         except OSError:
             # Skip unreadable/broken entries.
             continue
+
+    # Sort after metadata extraction to avoid is_dir()/stat() failures during sorting.
+    entries.sort(key=lambda item: (item["type"] != "dir", str(item["name"]).lower()))
 
     parent = None
     if target != BROWSE_ROOT:
