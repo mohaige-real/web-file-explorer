@@ -177,7 +177,7 @@ function renderGrid(tab) {
       const openActionOnCard = entry.type === "dir"
         ? `ondblclick="openDir('${encodeURIComponent(entry.path)}')" title="双击打开文件夹"`
         : `onclick="previewFile('${encodeURIComponent(entry.path)}')" title="单击预览文件"`;
-      return `<div class="entry-card" ${openActionOnCard} oncontextmenu="showContextMenu(event, '${encodeURIComponent(entry.path)}')"><div class="entry-main"><div class="entry-icon">${icon}</div><div class="entry-text" style="min-width:0;flex:1;"><div class="entry-title">${escapeHtml(entry.name)}</div>${buildMetaByDensity(entry)}</div></div></div>`;
+      return `<div class="entry-card" ${openActionOnCard} oncontextmenu="showContextMenu(event, '${encodeURIComponent(entry.path)}', '${entry.type}')"><div class="entry-main"><div class="entry-icon">${icon}</div><div class="entry-text" style="min-width:0;flex:1;"><div class="entry-title">${escapeHtml(entry.name)}</div>${buildMetaByDensity(entry)}</div></div></div>`;
     })
     .join("");
   showStatus(`显示 ${sorted.length} / 共 ${tab.entries.length} 项`);
@@ -234,13 +234,20 @@ async function apiPost(url, payload) {
 }
 async function refreshCurrentTab() { const tab = getActiveTab(); if (tab) await fetchDir(tab.id, tab.currentPath, false, false); }
 
-window.showContextMenu = function showContextMenu(event, encodedPath) {
+window.showContextMenu = function showContextMenu(event, encodedPath, entryType = "file") {
   event.preventDefault();
   contextTargetPath = decodeURIComponent(encodedPath);
-  contextMenuEl.innerHTML = `<button onclick="renameTarget()">重命名</button><button onclick="moveTarget()">移动到...</button><button onclick="copyTarget()">复制到...</button><button onclick="deleteTarget()">删除</button>`;
+  const historyBtn = entryType === "dir" ? `<button onclick="addFolderToHistory()">添加到历史记录</button>` : "";
+  contextMenuEl.innerHTML = `${historyBtn}<button onclick="renameTarget()">重命名</button><button onclick="moveTarget()">移动到...</button><button onclick="copyTarget()">复制到...</button><button onclick="deleteTarget()">删除</button>`;
   contextMenuEl.style.left = `${event.clientX}px`;
   contextMenuEl.style.top = `${event.clientY}px`;
   contextMenuEl.style.display = "block";
+};
+window.addFolderToHistory = function addFolderToHistory() {
+  if (!contextTargetPath) return;
+  rememberManualPath(contextTargetPath);
+  hideContextMenu();
+  showStatus("已添加到历史记录");
 };
 window.renameTarget = async function renameTarget() { if (!contextTargetPath) return; const newName = prompt("输入新名称："); hideContextMenu(); if (!newName) return; try { await apiPost("/api/ops/rename", { path: contextTargetPath, new_name: newName }); await refreshCurrentTab(); } catch (err) { showStatus(err.message, true); } };
 window.moveTarget = async function moveTarget() { if (!contextTargetPath) return; const destinationDir = prompt("输入目标目录绝对路径："); hideContextMenu(); if (!destinationDir) return; try { await apiPost("/api/ops/move", { path: contextTargetPath, destination_dir: destinationDir }); await refreshCurrentTab(); } catch (err) { showStatus(err.message, true); } };

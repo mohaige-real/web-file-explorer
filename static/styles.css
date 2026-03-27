@@ -65,7 +65,7 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 .layout { display: flex; gap: 0; position: relative; z-index: 1; }
 .left-panel { width: var(--left-panel-width); min-width: 300px; }
 .right-panel { flex: 1; min-width: 280px; }
-.panel { padding: 14px; height: calc(100vh - 170px); overflow: auto; }
+.panel { padding: 14px; height: calc(100vh - 170px); overflow-x: auto; overflow-y: scroll; scrollbar-gutter: stable; }
 .resizer { width: 10px; cursor: col-resize; background: transparent; position: relative; }
 .resizer::after { content: ""; position: absolute; left: 3px; top: 20px; bottom: 20px; width: 4px; border-radius: 8px; background: #cad8f4; }
 
