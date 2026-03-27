@@ -1,4 +1,4 @@
-const tbody = document.getElementById("file-table-body");
+const fileGridEl = document.getElementById("file-grid");
 const statusEl = document.getElementById("status");
 const pathInput = document.getElementById("path-input");
 const upBtn = document.getElementById("up-btn");
@@ -7,12 +7,22 @@ const previewMetaEl = document.getElementById("preview-meta");
 const previewContentEl = document.getElementById("preview-content");
 const tabbarEl = document.getElementById("tabbar");
 const newTabBtn = document.getElementById("new-tab-btn");
+const sortSelect = document.getElementById("sort-select");
+const iconSizeInput = document.getElementById("icon-size");
+const columnCountSelect = document.getElementById("column-count");
+const densitySelect = document.getElementById("density-select");
 
 const rootPath = document.getElementById("root-path").textContent;
 
 let tabs = [];
 let activeTabId = null;
 let nextTabId = 1;
+
+const uiPrefs = {
+  iconSize: 44,
+  columns: 3,
+  density: "high", // low: name, medium: name+size, high: name+size+modified
+};
 
 function showStatus(msg, isError = false) {
   statusEl.textContent = msg;
@@ -40,6 +50,14 @@ function shortenPathLabel(path) {
   return `${path.slice(0, 8)}...${path.slice(-15)}`;
 }
 
+function applyUiPrefs() {
+  document.documentElement.style.setProperty("--icon-size", `${uiPrefs.iconSize}px`);
+  document.documentElement.style.setProperty("--columns", String(uiPrefs.columns));
+  iconSizeInput.value = String(uiPrefs.iconSize);
+  columnCountSelect.value = String(uiPrefs.columns);
+  densitySelect.value = uiPrefs.density;
+}
+
 function renderTabs() {
   tabbarEl.innerHTML = tabs
     .map(
@@ -62,53 +80,61 @@ function clearPreview(tab, message = "请从左侧选择一个文件进行预览
 function sortEntries(entries, tab) {
   const sorted = [...entries];
   sorted.sort((a, b) => {
-    let av = a[tab.sortKey];
-    let bv = b[tab.sortKey];
-
     if (tab.sortKey === "type") {
-      av = a.type === "dir" ? 0 : 1;
-      bv = b.type === "dir" ? 0 : 1;
+      const av = a.type === "dir" ? 0 : 1;
+      const bv = b.type === "dir" ? 0 : 1;
       if (av === bv) {
         return a.name.localeCompare(b.name) * tab.sortDir;
       }
       return (av - bv) * tab.sortDir;
     }
-
     if (tab.sortKey === "name") {
       return a.name.localeCompare(b.name) * tab.sortDir;
     }
-
     if (tab.sortKey === "size") {
       return (a.size - b.size) * tab.sortDir;
     }
-
     return a.modified.localeCompare(b.modified) * tab.sortDir;
   });
   return sorted;
 }
 
-function renderTable(tab) {
+function buildMetaByDensity(entry) {
+  if (uiPrefs.density === "low") {
+    return "";
+  }
+  if (uiPrefs.density === "medium") {
+    return `<div class="entry-meta">大小：${escapeHtml(entry.size_human)}</div>`;
+  }
+  return `<div class="entry-meta">大小：${escapeHtml(entry.size_human)}<br/>修改：${escapeHtml(formatDate(entry.modified))}</div>`;
+}
+
+function renderGrid(tab) {
   const sorted = sortEntries(tab.entries, tab);
-  tbody.innerHTML = sorted
+  fileGridEl.innerHTML = sorted
     .map((entry) => {
+      const icon = entry.type === "dir" ? "📁" : "📄";
       const openAction =
         entry.type === "dir"
-          ? `<span class="dir-link" onclick="openDir('${encodeURIComponent(entry.path)}')">${escapeHtml(entry.name)}</span>`
-          : `<span class="file-link" onclick="previewFile('${encodeURIComponent(entry.path)}')">${escapeHtml(entry.name)}</span>`;
-
+          ? `onclick="openDir('${encodeURIComponent(entry.path)}')"`
+          : `onclick="previewFile('${encodeURIComponent(entry.path)}')"`;
       const fileAction =
         entry.type === "file"
           ? `<a href="/api/download?path=${encodeURIComponent(entry.path)}">下载</a>`
-          : "-";
+          : `<span class="muted">文件夹</span>`;
 
       return `
-      <tr>
-        <td>${entry.type === "dir" ? "📁 文件夹" : "📄 文件"}</td>
-        <td class="name-cell">${openAction}</td>
-        <td>${entry.size_human}</td>
-        <td>${formatDate(entry.modified)}</td>
-        <td>${fileAction}</td>
-      </tr>`;
+        <div class="entry-card">
+          <div class="entry-main">
+            <div class="entry-icon">${icon}</div>
+            <div class="entry-text" style="min-width:0;flex:1;">
+              <a href="javascript:void(0)" class="entry-title" ${openAction}>${escapeHtml(entry.name)}</a>
+              ${buildMetaByDensity(entry)}
+            </div>
+          </div>
+          <div class="entry-actions">${fileAction}</div>
+        </div>
+      `;
     })
     .join("");
 }
@@ -116,7 +142,7 @@ function renderTable(tab) {
 function renderActiveTab() {
   const tab = getActiveTab();
   if (!tab) {
-    tbody.innerHTML = "";
+    fileGridEl.innerHTML = "";
     pathInput.value = "";
     showStatus("没有可用标签页", true);
     previewMetaEl.textContent = "";
@@ -125,7 +151,8 @@ function renderActiveTab() {
   }
 
   pathInput.value = tab.currentPath;
-  renderTable(tab);
+  sortSelect.value = tab.sortKey;
+  renderGrid(tab);
   showStatus(`共 ${tab.entries.length} 项`);
   previewMetaEl.innerHTML = tab.previewMeta;
   previewContentEl.innerHTML = tab.previewHTML;
@@ -318,20 +345,36 @@ pathInput.addEventListener("keydown", (event) => {
   }
 });
 
-document.querySelectorAll("th[data-sort]").forEach((th) => {
-  th.addEventListener("click", () => {
-    const tab = getActiveTab();
-    if (!tab) return;
-
-    const key = th.dataset.sort;
-    if (tab.sortKey === key) {
-      tab.sortDir *= -1;
-    } else {
-      tab.sortKey = key;
-      tab.sortDir = 1;
-    }
-    renderTable(tab);
-  });
+sortSelect.addEventListener("change", () => {
+  const tab = getActiveTab();
+  if (!tab) return;
+  if (tab.sortKey === sortSelect.value) {
+    tab.sortDir *= -1;
+  } else {
+    tab.sortKey = sortSelect.value;
+    tab.sortDir = 1;
+  }
+  renderGrid(tab);
 });
 
+iconSizeInput.addEventListener("input", () => {
+  uiPrefs.iconSize = Number(iconSizeInput.value);
+  applyUiPrefs();
+});
+
+columnCountSelect.addEventListener("change", () => {
+  uiPrefs.columns = Number(columnCountSelect.value);
+  applyUiPrefs();
+});
+
+densitySelect.addEventListener("change", () => {
+  uiPrefs.density = densitySelect.value;
+  applyUiPrefs();
+  const tab = getActiveTab();
+  if (tab) {
+    renderGrid(tab);
+  }
+});
+
+applyUiPrefs();
 createTab(rootPath);

@@ -8,40 +8,64 @@
   </head>
   <body>
     <main class="container">
-      <h1>网页文件浏览器</h1>
+      <header class="hero">
+        <h1>网页文件浏览器</h1>
+        <p>现代化文件浏览与预览体验</p>
+      </header>
 
-      <section class="tabbar-wrap">
+      <section class="tabbar-wrap glass">
         <div id="tabbar" class="tabbar"></div>
-        <button id="new-tab-btn" type="button">+ 新建标签页</button>
+        <button id="new-tab-btn" type="button" class="btn primary">+ 新建标签页</button>
       </section>
 
-      <section class="toolbar">
-        <button id="up-btn" type="button">⬆ 返回上级</button>
+      <section class="toolbar glass">
+        <button id="up-btn" type="button" class="btn">⬆ 返回上级</button>
         <input id="path-input" type="text" autocomplete="off" />
-        <button id="go-btn" type="button">打开路径</button>
+        <button id="go-btn" type="button" class="btn primary">打开路径</button>
       </section>
 
       <p class="hint">浏览范围根目录：<code id="root-path">{{ browse_root }}</code></p>
 
       <section class="layout">
-        <article class="panel left-panel">
-          <h2>文件夹浏览</h2>
-          <table>
-            <thead>
-              <tr>
-                <th data-sort="type">类型</th>
-                <th data-sort="name">文件名</th>
-                <th data-sort="size">大小</th>
-                <th data-sort="modified">修改日期</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="file-table-body"></tbody>
-          </table>
+        <article class="panel left-panel glass">
+          <div class="panel-head">
+            <h2>文件夹浏览</h2>
+            <div class="display-controls">
+              <label>排序
+                <select id="sort-select">
+                  <option value="type">类型</option>
+                  <option value="name">名称</option>
+                  <option value="size">大小</option>
+                  <option value="modified">修改日期</option>
+                </select>
+              </label>
+              <label>图标大小
+                <input id="icon-size" type="range" min="28" max="88" step="4" value="44" />
+              </label>
+              <label>列数
+                <select id="column-count">
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                </select>
+              </label>
+              <label>信息密度
+                <select id="density-select">
+                  <option value="low">低（仅文件名）</option>
+                  <option value="medium">中（文件名+大小）</option>
+                  <option value="high" selected>高（文件名+大小+修改日期）</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div id="file-grid" class="file-grid"></div>
           <p id="status"></p>
         </article>
 
-        <article class="panel right-panel">
+        <article class="panel right-panel glass">
           <h2>文件预览</h2>
           <div id="preview-meta" class="preview-meta">请从左侧选择一个文件进行预览。</div>
           <div id="preview-content" class="preview-content"></div>
