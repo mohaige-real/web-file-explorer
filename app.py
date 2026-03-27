@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import mimetypes
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -66,6 +67,23 @@ def _get_file_kind(path: Path) -> str:
     if mime_type in {"application/pdf", "application/json", "application/xml"}:
         return "text"
     return "binary"
+
+
+def _json_payload() -> dict[str, Any]:
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        abort(400, description="Invalid JSON payload")
+    return payload
+
+
+def _resolve_from_payload(payload: dict[str, Any], key: str) -> Path:
+    raw_path = payload.get(key, "")
+    if not isinstance(raw_path, str) or not raw_path:
+        abort(400, description=f"Missing {key}")
+    try:
+        return _safe_path(raw_path)
+    except PermissionError:
+        abort(403, description="Access denied")
 
 
 @app.route("/")
@@ -185,6 +203,88 @@ def text_preview():
             "content": content,
         }
     )
+
+
+@app.route("/api/ops/rename", methods=["POST"])
+def rename_path():
+    payload = _json_payload()
+    source = _resolve_from_payload(payload, "path")
+    new_name = payload.get("new_name", "")
+
+    if not source.exists():
+        abort(404, description="Path not found")
+    if not isinstance(new_name, str) or not new_name.strip() or "/" in new_name or "\\" in new_name:
+        abort(400, description="Invalid new_name")
+
+    destination = source.parent / new_name.strip()
+    try:
+        destination.relative_to(BROWSE_ROOT)
+    except ValueError:
+        abort(403, description="Access denied")
+
+    if destination.exists():
+        abort(409, description="Destination already exists")
+
+    source.rename(destination)
+    return jsonify({"ok": True, "path": str(destination)})
+
+
+@app.route("/api/ops/move", methods=["POST"])
+def move_path():
+    payload = _json_payload()
+    source = _resolve_from_payload(payload, "path")
+    destination_dir = _resolve_from_payload(payload, "destination_dir")
+
+    if not source.exists():
+        abort(404, description="Path not found")
+    if not destination_dir.exists() or not destination_dir.is_dir():
+        abort(404, description="Destination directory not found")
+
+    destination = destination_dir / source.name
+    if destination.exists():
+        abort(409, description="Destination already exists")
+
+    shutil.move(str(source), str(destination))
+    return jsonify({"ok": True, "path": str(destination)})
+
+
+@app.route("/api/ops/copy", methods=["POST"])
+def copy_path():
+    payload = _json_payload()
+    source = _resolve_from_payload(payload, "path")
+    destination_dir = _resolve_from_payload(payload, "destination_dir")
+
+    if not source.exists():
+        abort(404, description="Path not found")
+    if not destination_dir.exists() or not destination_dir.is_dir():
+        abort(404, description="Destination directory not found")
+
+    destination = destination_dir / source.name
+    if destination.exists():
+        abort(409, description="Destination already exists")
+
+    if source.is_dir():
+        shutil.copytree(source, destination)
+    else:
+        shutil.copy2(source, destination)
+
+    return jsonify({"ok": True, "path": str(destination)})
+
+
+@app.route("/api/ops/delete", methods=["POST"])
+def delete_path():
+    payload = _json_payload()
+    source = _resolve_from_payload(payload, "path")
+
+    if not source.exists():
+        abort(404, description="Path not found")
+
+    if source.is_dir():
+        shutil.rmtree(source)
+    else:
+        source.unlink()
+
+    return jsonify({"ok": True})
 
 
 @app.route("/api/download")
