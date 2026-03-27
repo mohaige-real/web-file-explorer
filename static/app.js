@@ -96,24 +96,29 @@ function hideSuggestions() { pathSuggestionsEl.style.display = "none"; }
 
 function renderPathSuggestions() {
   const q = pathInput.value.trim();
-  const items = [];
-  if (q) items.push({ type: "open", path: q });
+  const items = [{ type: "open", path: q }];
   for (const p of manualOpenedHistory) items.push({ type: "history", path: p });
-  if (items.length === 0) {
-    hideSuggestions();
-    return;
-  }
 
   pathSuggestionsEl.innerHTML = items
     .map((item) => {
       if (item.type === "open") {
-        return `<div class="suggest-item" onclick="openFromSuggestion('${encodeURIComponent(item.path)}')"><span>打开路径：${escapeHtml(item.path)}</span></div>`;
+        return `<div class="suggest-item" onclick="openPathDialog()"><span>打开路径...</span></div>`;
       }
       return `<div class="suggest-item" onclick="openFromSuggestion('${encodeURIComponent(item.path)}')"><span>${escapeHtml(item.path)}</span><button onclick="deleteSuggestionPath(event, '${encodeURIComponent(item.path)}')">删除</button></div>`;
     })
     .join("");
   pathSuggestionsEl.style.display = "block";
 }
+
+window.openPathDialog = async function openPathDialog() {
+  const tab = getActiveTab();
+  if (!tab) return;
+  const selected = prompt("请输入要打开的路径：", pathInput.value.trim() || tab.currentPath);
+  hideSuggestions();
+  if (!selected) return;
+  const ok = await fetchDir(tab.id, selected, true, true);
+  if (ok) rememberManualPath(selected);
+};
 
 window.openFromSuggestion = async function openFromSuggestion(encodedPath) {
   const path = decodeURIComponent(encodedPath);
@@ -316,7 +321,7 @@ pathInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
     const q = pathInput.value.trim();
-    if (!q) return;
+    if (!q) return openPathDialog();
     openFromSuggestion(encodeURIComponent(q));
   }
 });
