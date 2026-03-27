@@ -128,23 +128,18 @@ function renderGrid(tab) {
       const icon = entry.type === "dir" ? "📁" : "📄";
       const openAction =
         entry.type === "dir"
-          ? `onclick="openDir('${encodeURIComponent(entry.path)}')"`
-          : `onclick="previewFile('${encodeURIComponent(entry.path)}')"`;
-      const fileAction =
-        entry.type === "file"
-          ? `<a href="/api/download?path=${encodeURIComponent(entry.path)}">下载</a>`
-          : `<span class="muted">文件夹</span>`;
+          ? `ondblclick="openDir('${encodeURIComponent(entry.path)}')" title="双击打开文件夹"`
+          : `ondblclick="previewFile('${encodeURIComponent(entry.path)}')" title="双击预览文件"`;
 
       return `
         <div class="entry-card" oncontextmenu="showContextMenu(event, '${encodeURIComponent(entry.path)}')">
           <div class="entry-main">
-            <div class="entry-icon">${icon}</div>
+            <div class="entry-icon" ${openAction}>${icon}</div>
             <div class="entry-text" style="min-width:0;flex:1;">
-              <a href="javascript:void(0)" class="entry-title" ${openAction}>${escapeHtml(entry.name)}</a>
+              <div class="entry-title">${escapeHtml(entry.name)}</div>
               ${buildMetaByDensity(entry)}
             </div>
           </div>
-          <div class="entry-actions">${fileAction}</div>
         </div>
       `;
     })
