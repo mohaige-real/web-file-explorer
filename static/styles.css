@@ -13,9 +13,6 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f3f7ff 40%, #edf2ff 100%); color: var(--text); }
 .container { width: 100%; margin: 0; padding: 10px 10px 14px; }
-.hero { margin-bottom: 14px; }
-.hero h1 { margin: 0; }
-.hero p { margin: 4px 0 0; color: var(--muted); }
 .glass { backdrop-filter: blur(6px); background: var(--card); border: 1px solid var(--line); box-shadow: 0 8px 30px rgba(30, 64, 175, 0.08); border-radius: 14px; }
 
 .tabbar-wrap, .toolbar { display: flex; gap: 10px; align-items: center; padding: 10px; margin-bottom: 12px; }
