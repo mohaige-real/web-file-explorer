@@ -19,8 +19,33 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 .tabbar-wrap, .toolbar { display: flex; gap: 10px; align-items: center; padding: 10px; }
 .toolbar { position: relative; z-index: 2000; }
 .tabbar { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
-.tab { border: 1px solid #d8e0ea; background: #fff; border-radius: 18px; padding: 6px 10px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; max-width: 290px; }
-.tab.active { background: var(--brand-soft); border-color: #98bbff; }
+.tabbar-wrap {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.tab {
+  border: 1px solid #cfdaf1;
+  border-bottom: 1px solid #cfdaf1;
+  background: #ecf3ff;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  max-width: 290px;
+  margin-bottom: -1px;
+}
+.tab.active {
+  background: #fff;
+  border-color: #9fbaf3;
+  border-bottom-color: #fff;
+}
 .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-close { border: none; background: transparent; cursor: pointer; color: #667287; padding: 0; font-size: 15px; }
 
@@ -28,7 +53,14 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 .btn.primary { border-color: #9abaff; background: linear-gradient(180deg, #eaf2ff 0%, #dbe9ff 100%); color: #1844b7; }
 .path-box { position: relative; flex: 1; }
 .toolbar input { width: 100%; border: 1px solid #cad7ef; border-radius: 10px; padding: 10px; background: #fff; }
-.hint { color: var(--muted); margin: 0; }
+.toolbar {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-top: 0;
+}
 
 .path-suggestions {
   position: absolute;
@@ -62,18 +94,20 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
   cursor: pointer;
 }
 
-.layout { display: flex; gap: 0; position: relative; z-index: 1; }
+.layout { display: flex; gap: 0; position: relative; z-index: 1; margin-top: 0; }
 .left-panel { width: var(--left-panel-width); min-width: 300px; }
 .right-panel { flex: 1; min-width: 280px; }
 .panel { padding: 14px; height: calc(100vh - 170px); overflow-x: auto; overflow-y: scroll; scrollbar-gutter: stable; }
+.left-panel, .right-panel { border-top-left-radius: 0; border-top-right-radius: 0; border-top: none; }
 .resizer { width: 10px; cursor: col-resize; background: transparent; position: relative; }
 .resizer::after { content: ""; position: absolute; left: 3px; top: 20px; bottom: 20px; width: 4px; border-radius: 8px; background: #cad8f4; }
 
-.panel-head { display: flex; gap: 10px; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+.panel-head { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .panel-head h2, .right-panel h2 { margin: 0; }
 .display-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
-.display-controls label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
-.display-controls select, .display-controls input[type="range"] { border: 1px solid #d3ddf1; border-radius: 8px; background: #fff; padding: 5px 8px; min-height: 34px; }
+.display-controls .btn { min-height: 36px; }
+.display-controls label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px; border: 1px solid #d3ddf1; border-radius: 8px; background: #fff; }
+.display-controls select, .display-controls input[type="range"] { border: 0; background: transparent; padding: 0; min-height: 30px; }
 .display-controls input[type="text"] { border: 1px solid #d3ddf1; border-radius: 8px; background: #fff; padding: 7px 10px; min-height: 34px; min-width: 280px; }
 
 .file-grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: 10px; }
