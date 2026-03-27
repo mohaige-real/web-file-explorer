@@ -17,6 +17,7 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 .glass { backdrop-filter: blur(6px); background: var(--card); border: 1px solid var(--line); box-shadow: 0 8px 30px rgba(30, 64, 175, 0.08); border-radius: 14px; }
 
 .tabbar-wrap, .toolbar { display: flex; gap: 10px; align-items: center; padding: 10px; }
+.toolbar { position: relative; z-index: 2000; }
 .tabbar { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
 .tab { border: 1px solid #d8e0ea; background: #fff; border-radius: 18px; padding: 6px 10px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; max-width: 290px; }
 .tab.active { background: var(--brand-soft); border-color: #98bbff; }
@@ -38,7 +39,7 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
   border: 1px solid #d3ddf1;
   border-radius: 10px;
   box-shadow: 0 10px 24px rgba(16, 42, 117, .16);
-  z-index: 30;
+  z-index: 9999;
   display: none;
   max-height: 220px;
   overflow: auto;
@@ -61,7 +62,7 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
   cursor: pointer;
 }
 
-.layout { display: flex; gap: 0; }
+.layout { display: flex; gap: 0; position: relative; z-index: 1; }
 .left-panel { width: var(--left-panel-width); min-width: 300px; }
 .right-panel { flex: 1; min-width: 280px; }
 .panel { padding: 14px; height: calc(100vh - 170px); overflow: auto; }
