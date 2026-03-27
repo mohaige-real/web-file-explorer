@@ -18,7 +18,8 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 
 .tabbar-wrap, .toolbar { display: flex; gap: 10px; align-items: center; padding: 10px; }
 .toolbar { position: relative; z-index: 2000; }
-.tabbar { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+.tabbar-wrap { justify-content: flex-start; }
+.tabbar { display: flex; gap: 8px; flex-wrap: wrap; flex: 0 1 auto; }
 .tabbar-wrap {
   margin-bottom: 0;
   padding-bottom: 0;
