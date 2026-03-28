@@ -100,6 +100,14 @@ body { margin: 0; background: radial-gradient(circle at top right, #d8e6ff 0, #f
 .right-panel { flex: 1; min-width: 280px; }
 .panel { padding: 14px; height: calc(100vh - 170px); overflow-x: auto; overflow-y: scroll; scrollbar-gutter: stable; }
 .left-panel, .right-panel { border-top-left-radius: 0; border-top-right-radius: 0; border-top: none; }
+.browser-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: linear-gradient(180deg, rgba(248, 252, 255, 0.98), rgba(248, 252, 255, 0.92));
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
 .resizer { width: 10px; cursor: col-resize; background: transparent; position: relative; }
 .resizer::after { content: ""; position: absolute; left: 3px; top: 20px; bottom: 20px; width: 4px; border-radius: 8px; background: #cad8f4; }
 
