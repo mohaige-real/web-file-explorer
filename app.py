@@ -14,6 +14,7 @@ app = Flask(__name__)
 # Restrict browsing to this root directory. You can change it with FILE_BROWSER_ROOT.
 BROWSE_ROOT = Path(os.environ.get("FILE_BROWSER_ROOT", "/")).resolve()
 MAX_TEXT_PREVIEW_SIZE = 512 * 1024  # 512 KB
+TEXT_CHUNK_SIZE = 32 * 1024  # 32 KB
 
 
 def _safe_path(raw_path: str) -> Path:
@@ -209,6 +210,50 @@ def text_preview():
             "path": str(target),
             "encoding": encoding,
             "content": content,
+        }
+    )
+
+
+@app.route("/api/text-chunk")
+def text_chunk_preview():
+    raw_path = request.args.get("path", "")
+    if not raw_path:
+        abort(400, description="Missing path")
+
+    try:
+        target = _safe_path(raw_path)
+    except PermissionError:
+        abort(403, description="Access denied")
+
+    if not target.exists() or not target.is_file():
+        abort(404, description="File not found")
+
+    try:
+        offset = max(0, int(request.args.get("offset", "0")))
+        size = int(request.args.get("size", str(TEXT_CHUNK_SIZE)))
+    except ValueError:
+        abort(400, description="Invalid offset or size")
+
+    size = max(1, min(size, TEXT_CHUNK_SIZE))
+    file_size = target.stat().st_size
+
+    with target.open("rb") as f:
+        f.seek(offset)
+        data = f.read(size)
+
+    content = data.decode("utf-8", errors="replace")
+    next_offset = offset + len(data)
+    eof = next_offset >= file_size
+
+    return jsonify(
+        {
+            "path": str(target),
+            "offset": offset,
+            "next_offset": next_offset,
+            "size": len(data),
+            "eof": eof,
+            "content": content,
+            "file_size": file_size,
         }
     )
 

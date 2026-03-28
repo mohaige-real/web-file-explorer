@@ -18,7 +18,6 @@
         <button id="up-btn" type="button" class="btn">⬆ 返回上级</button>
         <div class="path-box">
           <input id="path-input" type="text" autocomplete="off" />
-          <div id="path-suggestions" class="path-suggestions"></div>
         </div>
       </section>
 
@@ -65,8 +64,10 @@
         <div id="resizer" class="resizer" title="拖动调整左右栏宽度"></div>
 
         <article class="panel right-panel glass" id="right-panel">
-          <h2>文件预览</h2>
-          <div id="preview-meta" class="preview-meta">请从左侧选择一个文件进行预览。</div>
+          <div class="preview-toolbar">
+            <h2>文件预览</h2>
+            <div id="preview-meta" class="preview-meta">请从左侧选择一个文件进行预览。</div>
+          </div>
           <div id="preview-content" class="preview-content"></div>
         </article>
       </section>

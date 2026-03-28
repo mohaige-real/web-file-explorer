@@ -1,7 +1,6 @@
 const fileGridEl = document.getElementById("file-grid");
 const statusEl = document.getElementById("status");
 const pathInput = document.getElementById("path-input");
-const pathSuggestionsEl = document.getElementById("path-suggestions");
 const backBtn = document.getElementById("back-btn");
 const upBtn = document.getElementById("up-btn");
 const previewMetaEl = document.getElementById("preview-meta");
@@ -26,6 +25,7 @@ const resizerEl = document.getElementById("resizer");
 const rootPath = document.getElementById("root-path").textContent;
 const PREFS_KEY = "web_file_explorer_prefs_v1";
 const HISTORY_KEY = "web_file_explorer_opened_paths_v1";
+const CHUNK_SIZE = 32 * 1024;
 
 let tabs = [];
 let activeTabId = null;
@@ -36,25 +36,14 @@ let manualOpenedHistory = [];
 const densityMap = { 1: { label: "低" }, 2: { label: "中" }, 3: { label: "高" } };
 const uiPrefs = { iconSize: 44, columns: 3, densityLevel: 3 };
 
-function showStatus(msg, isError = false) {
-  statusEl.textContent = msg;
-  statusEl.className = isError ? "error" : "";
-}
-function debounce(fn, delay = 120) {
-  let timer = null;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-}
+function showStatus(msg, isError = false) { statusEl.textContent = msg; statusEl.className = isError ? "error" : ""; }
+function debounce(fn, delay = 120) { let timer = null; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); }; }
 function formatDate(isoDate) { return new Date(isoDate).toLocaleString(); }
 function escapeHtml(raw) { const div = document.createElement("div"); div.textContent = raw; return div.innerHTML; }
 function getActiveTab() { return tabs.find((tab) => tab.id === activeTabId) || null; }
 function shortenPathLabel(path) { return path.length <= 26 ? (path || "(空路径)") : `${path.slice(0, 8)}...${path.slice(-15)}`; }
 
-function savePrefs() {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(uiPrefs));
-}
+function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(uiPrefs)); }
 function loadPrefs() {
   try {
     const parsed = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
@@ -63,28 +52,18 @@ function loadPrefs() {
     if (Number.isFinite(parsed.densityLevel)) uiPrefs.densityLevel = Math.max(1, Math.min(3, parsed.densityLevel));
   } catch (_err) {}
 }
-
 function loadManualHistory() {
   try {
     const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
     if (Array.isArray(parsed)) manualOpenedHistory = parsed.filter((v) => typeof v === "string");
-  } catch (_err) {
-    manualOpenedHistory = [];
-  }
+  } catch (_err) { manualOpenedHistory = []; }
 }
-function saveManualHistory() {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(manualOpenedHistory.slice(0, 50)));
-}
+function saveManualHistory() { localStorage.setItem(HISTORY_KEY, JSON.stringify(manualOpenedHistory.slice(0, 50))); }
 function rememberManualPath(path) {
   const cleaned = path.trim();
   if (!cleaned) return;
   manualOpenedHistory = [cleaned, ...manualOpenedHistory.filter((item) => item !== cleaned)].slice(0, 50);
   saveManualHistory();
-}
-function deleteHistoryPath(path) {
-  manualOpenedHistory = manualOpenedHistory.filter((item) => item !== path);
-  saveManualHistory();
-  renderPathSuggestions();
 }
 
 function applyUiPrefs() {
@@ -99,47 +78,6 @@ function applyUiPrefs() {
 }
 
 function hideContextMenu() { contextMenuEl.style.display = "none"; contextTargetPath = null; }
-function hideSuggestions() { pathSuggestionsEl.style.display = "none"; }
-
-function renderPathSuggestions() {
-  const q = pathInput.value.trim();
-  const items = [{ type: "open", path: q }];
-  for (const p of manualOpenedHistory) items.push({ type: "history", path: p });
-
-  pathSuggestionsEl.innerHTML = items
-    .map((item) => {
-      if (item.type === "open") {
-        return `<div class="suggest-item" onclick="openPathDialog()"><span>打开路径...</span></div>`;
-      }
-      return `<div class="suggest-item" onclick="openFromSuggestion('${encodeURIComponent(item.path)}')"><span>${escapeHtml(item.path)}</span><button onclick="deleteSuggestionPath(event, '${encodeURIComponent(item.path)}')">删除</button></div>`;
-    })
-    .join("");
-  pathSuggestionsEl.style.display = "block";
-}
-
-window.openPathDialog = async function openPathDialog() {
-  const tab = getActiveTab();
-  if (!tab) return;
-  const selected = prompt("请输入要打开的路径：", pathInput.value.trim() || tab.currentPath);
-  hideSuggestions();
-  if (!selected) return;
-  const ok = await fetchDir(tab.id, selected, true, true);
-  if (ok) rememberManualPath(selected);
-};
-
-window.openFromSuggestion = async function openFromSuggestion(encodedPath) {
-  const path = decodeURIComponent(encodedPath);
-  const tab = getActiveTab();
-  hideSuggestions();
-  if (!tab) return;
-  const ok = await fetchDir(tab.id, path, true, true);
-  if (ok) rememberManualPath(path);
-};
-
-window.deleteSuggestionPath = function deleteSuggestionPath(event, encodedPath) {
-  event.stopPropagation();
-  deleteHistoryPath(decodeURIComponent(encodedPath));
-};
 
 function renderTabs() {
   tabbarEl.innerHTML = tabs
@@ -150,6 +88,8 @@ function renderTabs() {
 function clearPreview(tab, message = "请从左侧选择一个文件进行预览。") {
   tab.previewMeta = message;
   tab.previewHTML = "";
+  tab.previewText = "";
+  tab.previewStream = null;
   previewMetaEl.textContent = message;
   previewContentEl.innerHTML = "";
 }
@@ -169,14 +109,12 @@ function sortEntries(entries, tab) {
   });
   return sorted;
 }
-
 function filterEntries(entries) {
   const raw = searchInput.value.trim().toLowerCase();
   if (!raw) return entries;
   const terms = raw.split(/\s+/).filter(Boolean);
   return entries.filter((entry) => terms.every((term) => entry.name.toLowerCase().includes(term)));
 }
-
 function buildMetaByDensity(entry) {
   if (uiPrefs.densityLevel === 1) return "";
   if (uiPrefs.densityLevel === 2) return `<div class="entry-meta">大小：${escapeHtml(entry.size_human)}</div>`;
@@ -197,6 +135,23 @@ function renderGrid(tab) {
   showStatus(`显示 ${sorted.length} / 共 ${tab.entries.length} 项`);
 }
 
+function renderPreviewOnly(tab) {
+  if (!tab || tab.id !== activeTabId) return;
+  previewMetaEl.innerHTML = tab.previewMeta;
+
+  if (tab.previewStream) {
+    if (!previewContentEl.querySelector("#preview-text")) {
+      previewContentEl.innerHTML = `<pre id="preview-text"></pre>`;
+    }
+    const pre = previewContentEl.querySelector("#preview-text");
+    if (pre && pre.textContent !== tab.previewText) {
+      pre.textContent = tab.previewText;
+    }
+  } else {
+    previewContentEl.innerHTML = tab.previewHTML;
+  }
+}
+
 function renderActiveTab() {
   const tab = getActiveTab();
   if (!tab) return;
@@ -205,14 +160,8 @@ function renderActiveTab() {
   sortOrderBtn.textContent = tab.sortDir === 1 ? "升序 ↑" : "降序 ↓";
   backBtn.disabled = tab.navIndex <= 0;
   renderGrid(tab);
-  previewMetaEl.innerHTML = tab.previewMeta;
-  previewContentEl.innerHTML = tab.previewHTML;
+  renderPreviewOnly(tab);
   renderTabs();
-}
-function renderPreviewOnly(tab) {
-  if (!tab || tab.id !== activeTabId) return;
-  previewMetaEl.innerHTML = tab.previewMeta;
-  previewContentEl.innerHTML = tab.previewHTML;
 }
 
 async function fetchDir(tabId, path, resetPreview = true, trackHistory = true) {
@@ -262,33 +211,41 @@ window.showContextMenu = function showContextMenu(event, encodedPath, entryType 
   contextMenuEl.style.top = `${event.clientY}px`;
   contextMenuEl.style.display = "block";
 };
-window.addFolderToHistory = function addFolderToHistory() {
-  if (!contextTargetPath) return;
-  rememberManualPath(contextTargetPath);
-  hideContextMenu();
-  showStatus("已添加到历史记录");
-};
+window.addFolderToHistory = function addFolderToHistory() { if (!contextTargetPath) return; rememberManualPath(contextTargetPath); hideContextMenu(); showStatus("已添加到历史记录"); };
 window.renameTarget = async function renameTarget() { if (!contextTargetPath) return; const newName = prompt("输入新名称："); hideContextMenu(); if (!newName) return; try { await apiPost("/api/ops/rename", { path: contextTargetPath, new_name: newName }); await refreshCurrentTab(); } catch (err) { showStatus(err.message, true); } };
 window.moveTarget = async function moveTarget() { if (!contextTargetPath) return; const destinationDir = prompt("输入目标目录绝对路径："); hideContextMenu(); if (!destinationDir) return; try { await apiPost("/api/ops/move", { path: contextTargetPath, destination_dir: destinationDir }); await refreshCurrentTab(); } catch (err) { showStatus(err.message, true); } };
 window.copyTarget = async function copyTarget() { if (!contextTargetPath) return; const destinationDir = prompt("输入复制目标目录绝对路径："); hideContextMenu(); if (!destinationDir) return; try { await apiPost("/api/ops/copy", { path: contextTargetPath, destination_dir: destinationDir }); await refreshCurrentTab(); } catch (err) { showStatus(err.message, true); } };
 window.deleteTarget = async function deleteTarget() { if (!contextTargetPath) return; const ok = confirm(`确定删除吗？\n${contextTargetPath}`); hideContextMenu(); if (!ok) return; try { await apiPost("/api/ops/delete", { path: contextTargetPath }); await refreshCurrentTab(); } catch (err) { showStatus(err.message, true); } };
 
-async function previewText(path) { const resp = await fetch(`/api/text?path=${encodeURIComponent(path)}`); if (!resp.ok) throw new Error(`文本预览失败：${resp.status}`); return `<pre>${escapeHtml((await resp.json()).content)}</pre>`; }
-function buildImageHTML(path) { return `<img src="/api/raw?path=${encodeURIComponent(path)}" alt="image preview" />`; }
-function buildVideoHTML(path) { return `<video controls src="/api/raw?path=${encodeURIComponent(path)}"></video>`; }
-function buildAudioHTML(path) { return `<audio controls src="/api/raw?path=${encodeURIComponent(path)}"></audio>`; }
-function buildFallbackHTML(path, mimeType) { return `<p>当前文件类型暂不支持内嵌预览。</p><p>MIME: <code>${escapeHtml(mimeType || "unknown")}</code></p><p><a href="/api/raw?path=${encodeURIComponent(path)}" target="_blank" rel="noreferrer">新窗口打开</a></p>`; }
-
-function createTab(initialPath = rootPath) {
-  const tab = { id: nextTabId++, label: shortenPathLabel(initialPath), currentPath: initialPath, currentParent: null, entries: [], sortKey: "type", sortDir: 1, previewMeta: "请从左侧选择一个文件进行预览。", previewHTML: "", navStack: [initialPath], navIndex: 0 };
-  tabs.push(tab);
-  activeTabId = tab.id;
-  renderTabs();
-  fetchDir(tab.id, initialPath, true, false);
+async function loadNextTextChunk(tab) {
+  if (!tab || !tab.previewStream || tab.previewStream.loading || tab.previewStream.eof) return;
+  tab.previewStream.loading = true;
+  try {
+    const resp = await fetch(`/api/text-chunk?path=${encodeURIComponent(tab.previewStream.path)}&offset=${tab.previewStream.offset}&size=${CHUNK_SIZE}`);
+    if (!resp.ok) throw new Error(`文本分块加载失败：${resp.status}`);
+    const data = await resp.json();
+    tab.previewText += data.content;
+    tab.previewStream.offset = data.next_offset;
+    tab.previewStream.eof = data.eof;
+    renderPreviewOnly(tab);
+  } catch (err) {
+    tab.previewMeta = "预览失败";
+    tab.previewHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+    tab.previewStream = null;
+    renderPreviewOnly(tab);
+  } finally {
+    if (tab.previewStream) tab.previewStream.loading = false;
+  }
 }
-window.switchTab = function switchTab(tabId) { activeTabId = tabId; renderActiveTab(); };
-window.closeTab = function closeTab(event, tabId) { event.stopPropagation(); const idx = tabs.findIndex((tab) => tab.id === tabId); if (idx < 0) return; tabs.splice(idx, 1); if (tabs.length === 0) return createTab(rootPath); if (activeTabId === tabId) activeTabId = tabs[Math.max(0, idx - 1)].id; renderActiveTab(); };
-window.openDir = function openDir(encodedPath) { const tab = getActiveTab(); if (tab) fetchDir(tab.id, decodeURIComponent(encodedPath), true, true); };
+
+function startTextStreamPreview(tab, path) {
+  tab.previewStream = { path, offset: 0, eof: false, loading: false };
+  tab.previewText = "";
+  tab.previewHTML = "";
+  renderPreviewOnly(tab);
+  loadNextTextChunk(tab);
+}
+
 window.previewFile = async function previewFile(encodedPath) {
   const tab = getActiveTab();
   if (!tab) return;
@@ -296,48 +253,74 @@ window.previewFile = async function previewFile(encodedPath) {
   try {
     tab.previewMeta = "正在加载预览...";
     tab.previewHTML = "";
+    tab.previewText = "";
+    tab.previewStream = null;
     renderPreviewOnly(tab);
+
     const metaResp = await fetch(`/api/preview-meta?path=${encodeURIComponent(path)}`);
     if (!metaResp.ok) throw new Error(`获取预览信息失败：${metaResp.status}`);
     const meta = await metaResp.json();
     tab.previewMeta = `<strong>${escapeHtml(meta.name)}</strong><br />大小：${escapeHtml(meta.size_human)} ｜ 修改：${escapeHtml(formatDate(meta.modified))} ｜ 类型：${escapeHtml(meta.mime_type)}`;
-    if (meta.kind === "text") tab.previewHTML = meta.text_too_large ? `<p>文本文件过大（>${escapeHtml(String(512))}KB），请下载后查看。</p>` : await previewText(path);
-    else if (meta.kind === "image") tab.previewHTML = buildImageHTML(path);
-    else if (meta.kind === "video") tab.previewHTML = buildVideoHTML(path);
-    else if (meta.kind === "audio") tab.previewHTML = buildAudioHTML(path);
-    else tab.previewHTML = buildFallbackHTML(path, meta.mime_type);
-    renderPreviewOnly(tab);
+
+    if (meta.kind === "image") {
+      tab.previewHTML = `<img src="/api/raw?path=${encodeURIComponent(path)}" alt="image preview" />`;
+      renderPreviewOnly(tab);
+      return;
+    }
+    if (meta.kind === "video") {
+      tab.previewHTML = `<video controls src="/api/raw?path=${encodeURIComponent(path)}"></video>`;
+      renderPreviewOnly(tab);
+      return;
+    }
+    if (meta.kind === "audio") {
+      tab.previewHTML = `<audio controls src="/api/raw?path=${encodeURIComponent(path)}"></audio>`;
+      renderPreviewOnly(tab);
+      return;
+    }
+
+    // Text + unknown/binary types all use chunked text preview.
+    startTextStreamPreview(tab, path);
   } catch (err) {
     tab.previewMeta = "预览失败";
     tab.previewHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+    tab.previewStream = null;
     renderPreviewOnly(tab);
   }
 };
 
-newTabBtn.addEventListener("click", () => createTab(getActiveTab()?.currentPath || rootPath));
-backBtn.addEventListener("click", async () => {
+previewContentEl.addEventListener("scroll", () => {
   const tab = getActiveTab();
-  if (!tab || tab.navIndex <= 0) return;
-  tab.navIndex -= 1;
-  await fetchDir(tab.id, tab.navStack[tab.navIndex], true, false);
+  if (!tab || !tab.previewStream) return;
+  const nearBottom = previewContentEl.scrollTop + previewContentEl.clientHeight >= previewContentEl.scrollHeight - 24;
+  if (nearBottom) loadNextTextChunk(tab);
 });
+
+function createTab(initialPath = rootPath) {
+  const tab = { id: nextTabId++, label: shortenPathLabel(initialPath), currentPath: initialPath, currentParent: null, entries: [], sortKey: "type", sortDir: 1, previewMeta: "请从左侧选择一个文件进行预览。", previewHTML: "", previewText: "", previewStream: null, navStack: [initialPath], navIndex: 0 };
+  tabs.push(tab);
+  activeTabId = tab.id;
+  renderTabs();
+  fetchDir(tab.id, initialPath, true, false);
+}
+
+window.switchTab = function switchTab(tabId) { activeTabId = tabId; renderActiveTab(); };
+window.closeTab = function closeTab(event, tabId) { event.stopPropagation(); const idx = tabs.findIndex((tab) => tab.id === tabId); if (idx < 0) return; tabs.splice(idx, 1); if (tabs.length === 0) return createTab(rootPath); if (activeTabId === tabId) activeTabId = tabs[Math.max(0, idx - 1)].id; renderActiveTab(); };
+window.openDir = function openDir(encodedPath) { const tab = getActiveTab(); if (tab) fetchDir(tab.id, decodeURIComponent(encodedPath), true, true); };
+
+newTabBtn.addEventListener("click", () => createTab(getActiveTab()?.currentPath || rootPath));
+backBtn.addEventListener("click", async () => { const tab = getActiveTab(); if (!tab || tab.navIndex <= 0) return; tab.navIndex -= 1; await fetchDir(tab.id, tab.navStack[tab.navIndex], true, false); });
 upBtn.addEventListener("click", () => { const tab = getActiveTab(); if (tab?.currentParent) fetchDir(tab.id, tab.currentParent, true, true); });
 
-pathInput.addEventListener("focus", renderPathSuggestions);
-pathInput.addEventListener("input", renderPathSuggestions);
-pathSuggestionsEl.addEventListener("mousedown", (event) => {
-  // Prevent input blur before suggestion click is handled.
+pathInput.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
   event.preventDefault();
+  const tab = getActiveTab();
+  if (!tab) return;
+  const path = pathInput.value.trim();
+  if (!path) return;
+  const ok = await fetchDir(tab.id, path, true, true);
+  if (ok) rememberManualPath(path);
 });
-pathInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    const q = pathInput.value.trim();
-    if (!q) return openPathDialog();
-    openFromSuggestion(encodeURIComponent(q));
-  }
-});
-pathInput.addEventListener("blur", () => setTimeout(hideSuggestions, 120));
 
 sortSelect.addEventListener("change", () => { const tab = getActiveTab(); if (!tab) return; tab.sortKey = sortSelect.value; renderGrid(tab); });
 sortOrderBtn.addEventListener("click", () => { const tab = getActiveTab(); if (!tab) return; tab.sortDir *= -1; sortOrderBtn.textContent = tab.sortDir === 1 ? "升序 ↑" : "降序 ↓"; renderGrid(tab); });
@@ -361,10 +344,7 @@ window.addEventListener("mousemove", (event) => {
 });
 window.addEventListener("mouseup", () => { resizing = false; document.body.style.userSelect = ""; });
 
-window.addEventListener("click", (event) => {
-  if (!pathSuggestionsEl.contains(event.target) && event.target !== pathInput) hideSuggestions();
-  hideContextMenu();
-});
+window.addEventListener("click", hideContextMenu);
 window.addEventListener("scroll", hideContextMenu, true);
 
 loadPrefs();
