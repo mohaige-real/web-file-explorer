@@ -40,6 +40,13 @@ function showStatus(msg, isError = false) {
   statusEl.textContent = msg;
   statusEl.className = isError ? "error" : "";
 }
+function debounce(fn, delay = 120) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 function formatDate(isoDate) { return new Date(isoDate).toLocaleString(); }
 function escapeHtml(raw) { const div = document.createElement("div"); div.textContent = raw; return div.innerHTML; }
 function getActiveTab() { return tabs.find((tab) => tab.id === activeTabId) || null; }
@@ -202,6 +209,11 @@ function renderActiveTab() {
   previewContentEl.innerHTML = tab.previewHTML;
   renderTabs();
 }
+function renderPreviewOnly(tab) {
+  if (!tab || tab.id !== activeTabId) return;
+  previewMetaEl.innerHTML = tab.previewMeta;
+  previewContentEl.innerHTML = tab.previewHTML;
+}
 
 async function fetchDir(tabId, path, resetPreview = true, trackHistory = true) {
   const tab = tabs.find((item) => item.id === tabId);
@@ -284,7 +296,7 @@ window.previewFile = async function previewFile(encodedPath) {
   try {
     tab.previewMeta = "正在加载预览...";
     tab.previewHTML = "";
-    renderActiveTab();
+    renderPreviewOnly(tab);
     const metaResp = await fetch(`/api/preview-meta?path=${encodeURIComponent(path)}`);
     if (!metaResp.ok) throw new Error(`获取预览信息失败：${metaResp.status}`);
     const meta = await metaResp.json();
@@ -294,11 +306,11 @@ window.previewFile = async function previewFile(encodedPath) {
     else if (meta.kind === "video") tab.previewHTML = buildVideoHTML(path);
     else if (meta.kind === "audio") tab.previewHTML = buildAudioHTML(path);
     else tab.previewHTML = buildFallbackHTML(path, meta.mime_type);
-    if (tab.id === activeTabId) renderActiveTab();
+    renderPreviewOnly(tab);
   } catch (err) {
     tab.previewMeta = "预览失败";
     tab.previewHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
-    if (tab.id === activeTabId) renderActiveTab();
+    renderPreviewOnly(tab);
   }
 };
 
@@ -329,11 +341,11 @@ pathInput.addEventListener("blur", () => setTimeout(hideSuggestions, 120));
 
 sortSelect.addEventListener("change", () => { const tab = getActiveTab(); if (!tab) return; tab.sortKey = sortSelect.value; renderGrid(tab); });
 sortOrderBtn.addEventListener("click", () => { const tab = getActiveTab(); if (!tab) return; tab.sortDir *= -1; sortOrderBtn.textContent = tab.sortDir === 1 ? "升序 ↑" : "降序 ↓"; renderGrid(tab); });
-searchInput.addEventListener("input", () => { const tab = getActiveTab(); if (tab) renderGrid(tab); });
+searchInput.addEventListener("input", debounce(() => { const tab = getActiveTab(); if (tab) renderGrid(tab); }, 120));
 
-iconSizeInput.addEventListener("input", () => { uiPrefs.iconSize = Number(iconSizeInput.value); applyUiPrefs(); savePrefs(); });
-columnCountInput.addEventListener("input", () => { uiPrefs.columns = Number(columnCountInput.value); applyUiPrefs(); savePrefs(); });
-densitySlider.addEventListener("input", () => { uiPrefs.densityLevel = Number(densitySlider.value); applyUiPrefs(); savePrefs(); const tab = getActiveTab(); if (tab) renderGrid(tab); });
+iconSizeInput.addEventListener("input", debounce(() => { uiPrefs.iconSize = Number(iconSizeInput.value); applyUiPrefs(); savePrefs(); }, 80));
+columnCountInput.addEventListener("input", debounce(() => { uiPrefs.columns = Number(columnCountInput.value); applyUiPrefs(); savePrefs(); }, 80));
+densitySlider.addEventListener("input", debounce(() => { uiPrefs.densityLevel = Number(densitySlider.value); applyUiPrefs(); savePrefs(); const tab = getActiveTab(); if (tab) renderGrid(tab); }, 80));
 toggleDisplaySettingsBtn.addEventListener("click", () => {
   const isOpen = displaySettingsEl.classList.toggle("open");
   toggleDisplaySettingsBtn.textContent = isOpen ? "收起显示设置 ▴" : "展开显示设置 ▾";
